@@ -18,19 +18,19 @@ commands:
 
       ### You may modify the commands below. Uncomment/Comment lines based on the milestone
 
-      # run "rai -p <project-folder> --queue rai_amd64_ece408" to execute
-      # run "rai -p <project folder> --queue rai_amd64_ece408 --submit=m1" to submit
-      # run "rai -p <project-folder> history" to check submission. which should list an "m1" in the "SUBMITTED" column for that submission
+      # run "./rai -p <project-folder> --queue rai_amd64_ece408" to execute ("./rai -p ece408_project --queue rai_amd64_ece408")
+      # run "./rai -p <project folder> --queue rai_amd64_ece408 --submit=m1" to submit
+      # run "./rai -p <project-folder> history" to check submission. which should list an "m1" in the "SUBMITTED" column for that submission
 
       # ---------------- milestone 1 ----------------- #
-      - /bin/bash -c "time ./m1 100"  # 100 is the batchsize and default is 10000 (the max size) # "time" flag can time the whole program execution
+      # - /bin/bash -c "time ./m1 100"  # 100 is the batchsize and default is 10000 (the max size) # "time" flag can time the whole program execution
       # - /bin/bash -c "time ./m1 1000"
 
       # use "gprof" to profile the execution
-      - /bin/bash -c "gprof -Q m1 gmon.out"
-
+      # - /bin/bash -c "gprof -Q m1 gmon.out"
 
       # ---------------- milestone 2 ----------------- #
-      #- /bin/bash -c "./m2"
+      - /bin/bash -c "time ./m2 100"
+
       # ---------------- milestone 3 ----------------- #
       #- /bin/bash -c "./m3"
