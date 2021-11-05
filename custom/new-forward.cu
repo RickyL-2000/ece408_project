@@ -3,6 +3,7 @@
 #include "gpu-new-forward.h"
 
 #define BLOCK_WIDTH 16
+// #define DEBUG
 
 __global__ void conv_forward_kernel(
     float *y, const float *x, const float *k, 
@@ -41,12 +42,12 @@ __global__ void conv_forward_kernel(
 
     // Insert your GPU convolution kernel code here
 
-    // int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0));
-        // H_num = ceil(H_out / (BLOCK_WIDTH * 1.0)),
+    int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0));
+        // H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
     int b = blockIdx.x, m = blockIdx.y;
-    // int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.y,
-    //     w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.x;
-    int h = threadIdx.y, w = threadIdx.x;
+    int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.y,
+        w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.x;
+    // int h = threadIdx.y, w = threadIdx.x;
 
     int c, p, q;
     if (w < W_out && h < H_out) {
@@ -96,12 +97,14 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(
     cudaMemcpy(*device_x_ptr, host_x, x_size, cudaMemcpyHostToDevice);
     cudaMemcpy(*device_k_ptr, host_k, k_size, cudaMemcpyHostToDevice);
     
+#ifdef DEBUG
     cudaError_t error = cudaGetLastError();
     if(error != cudaSuccess)
     {
         std::cout<<"CUDA error@conv_forward_gpu_prolog: "<<cudaGetErrorString(error)<<std::endl;
         exit(-1);
     }
+#endif
 }
 
 
@@ -113,19 +116,31 @@ __host__ void GPUInterface::conv_forward_gpu(
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
 
+#ifdef DEBUG
     std::cout << "Output image: " << H_out << " x " << W_out << std::endl;
+    // print dimension information
+    std::cout << "Grid Dimension: " << B << " x " << M << " x " << W_num * H_num << std::endl;
+    std::cout << "Block Dimension: " << BLOCK_WIDTH << " x " << BLOCK_WIDTH << " x " << 1 << std::endl;
+#endif
 
-    dim3 dimBlock(W_out, H_out, 1);
-    dim3 dimGrid(B, M, 1);
+    int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0)),
+        H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
+
+    dim3 dimGrid(B, M, W_num * H_num);
+    dim3 dimBlock(BLOCK_WIDTH, BLOCK_WIDTH, 1);
 
     conv_forward_kernel<<<dimGrid, dimBlock>>>(device_y, device_x, device_k, B, M, C, H, W, K);
 
+    cudaDeviceSynchronize();
+
+#ifdef DEBUG
     cudaError_t error = cudaGetLastError();
     if(error != cudaSuccess)
     {
         std::cout<<"CUDA error@conv_forward_gpu: "<<cudaGetErrorString(error)<<std::endl;
         exit(-1);
     }
+#endif
 }
 
 

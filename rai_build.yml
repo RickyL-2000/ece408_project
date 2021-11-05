@@ -19,8 +19,8 @@ commands:
       ### You may modify the commands below. Uncomment/Comment lines based on the milestone
 
       # run "./rai -p <project-folder> --queue rai_amd64_ece408" to execute ("./rai -p ece408_project --queue rai_amd64_ece408")
-      # run "./rai -p <project folder> --queue rai_amd64_ece408 --submit=m1" to submit
-      # run "./rai -p <project-folder> history" to check submission. which should list an "m1" in the "SUBMITTED" column for that submission
+      # run "./rai -p <project folder> --queue rai_amd64_ece408 --submit=m1" to submit ("./rai -p ece408_project --queue rai_amd64_ece408 --submit=m1")
+      # run "./rai -p <project-folder> history" to check submission. which should list an "m1" in the "SUBMITTED" column for that submission ("./rai -p ece408_project history")
 
       # ---------------- milestone 1 ----------------- #
       # - /bin/bash -c "time ./m1 100"  # 100 is the batchsize and default is 10000 (the max size) # "time" flag can time the whole program execution
@@ -30,7 +30,16 @@ commands:
       # - /bin/bash -c "gprof -Q m1 gmon.out"
 
       # ---------------- milestone 2 ----------------- #
-      - /bin/bash -c "time ./m2 100"
+      # - /bin/bash -c "time ./m2 10000"
+      
+      # check ememory errors
+      # - /bin/bash -c "cuda-memcheck ./m2 100"
+
+      # use nsys to profile the execution
+      # - nsys profile --stats=true ./m2
+
+      # use nsight
+      # - nv-nsight-cu-cli --section '.*' -o analysis_file ./m2
 
       # ---------------- milestone 3 ----------------- #
       #- /bin/bash -c "./m3"
