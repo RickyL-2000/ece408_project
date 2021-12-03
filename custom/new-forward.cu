@@ -3,7 +3,7 @@
 #include "gpu-new-forward.h"
 
 #define BLOCK_WIDTH 16
-// #define DEBUG
+// #define CONV_DEBUG
 
 __global__ void conv_forward_kernel(
     float *y, const float *x, const float *k, 
@@ -50,16 +50,16 @@ __global__ void conv_forward_kernel(
     // int h = threadIdx.y, w = threadIdx.x;
 
     int c, p, q;
-    if (w < W_out && h < H_out) {
-        y4d(b, m, h, w) = 0.0f;
-        for (c = 0; c < C; ++c) {
-            for (p = 0; p < K; ++p) {
-                for (q = 0; q < K; ++q) {
-                    y4d(b, m, h, w) += x4d(b, c, h+p, w+q) * k4d(m, c, p, q);
-                }
+    float res = 0.0f;
+    if (w >= W_out || h >= H_out) return;
+    for (c = 0; c < C; ++c) {
+        for (p = 0; p < K; ++p) {
+            for (q = 0; q < K; ++q) {
+                res += x4d(b, c, h+p, w+q) * k4d(m, c, p, q);
             }
         }
     }
+    y4d(b, m, h, w) = res;
 
 #undef y4d
 #undef x4d
@@ -88,7 +88,9 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
 
-    int y_size = B*M*H_out*W_out*sizeof(float), x_size = B*C*H*W*sizeof(float), k_size = M*C*K*K*sizeof(float);
+    int y_size = B*M*H_out*W_out*sizeof(float), 
+        x_size = B*C*H*W*sizeof(float), 
+        k_size = M*C*K*K*sizeof(float);
     cudaMalloc((void**) device_y_ptr, y_size);
     cudaMalloc((void**) device_x_ptr, x_size);
     cudaMalloc((void**) device_k_ptr, k_size);
@@ -97,7 +99,7 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(
     cudaMemcpy(*device_x_ptr, host_x, x_size, cudaMemcpyHostToDevice);
     cudaMemcpy(*device_k_ptr, host_k, k_size, cudaMemcpyHostToDevice);
     
-#ifdef DEBUG
+#ifdef CONV_DEBUG
     cudaError_t error = cudaGetLastError();
     if(error != cudaSuccess)
     {
@@ -116,7 +118,7 @@ __host__ void GPUInterface::conv_forward_gpu(
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
 
-#ifdef DEBUG
+#ifdef CONV_DEBUG
     std::cout << "Output image: " << H_out << " x " << W_out << std::endl;
     // print dimension information
     std::cout << "Grid Dimension: " << B << " x " << M << " x " << W_num * H_num << std::endl;
@@ -133,7 +135,7 @@ __host__ void GPUInterface::conv_forward_gpu(
 
     cudaDeviceSynchronize();
 
-#ifdef DEBUG
+#ifdef CONV_DEBUG
     cudaError_t error = cudaGetLastError();
     if(error != cudaSuccess)
     {
@@ -151,7 +153,9 @@ __host__ void GPUInterface::conv_forward_gpu_epilog(
     // Copy the output back to host
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
-    int y_size = B*M*H_out*W_out*sizeof(float), x_size = B*C*H*W*sizeof(float), k_size = M*C*K*K*sizeof(float);
+    int y_size = B*M*H_out*W_out*sizeof(float), 
+        x_size = B*C*H*W*sizeof(float), 
+        k_size = M*C*K*K*sizeof(float);
     cudaMemcpy(host_y, device_y, y_size, cudaMemcpyDeviceToHost);
     // Free device memory
     cudaFree(device_y);
