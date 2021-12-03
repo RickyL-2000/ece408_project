@@ -3,6 +3,8 @@
 #include "gpu-new-forward.h"
 
 #define BLOCK_WIDTH 16
+#define TILE_WIDTH 16
+#define MASK_WIDTH 7
 #define CONV_DEBUG
 
 __global__ void conv_forward_kernel(
@@ -41,23 +43,48 @@ __global__ void conv_forward_kernel(
 #define k4d(i3, i2, i1, i0) k[(i3) * (C * K * K) + (i2) * (K * K) + (i1) * (K) + i0]
 
     // Insert your GPU convolution kernel code here
+    /* strategy 3 need to change dimBlock, so we choose strategy 1 */
+
+    __shared__ float X_tile[TILE_WIDTH+MASK_WIDTH-1][TILE_WIDTH+MASK_WIDTH-1];
+    __shared__ float K_tile[MASK_WIDTH][MASK_WIDTH];
 
     int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0));
         // H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
     int b = blockIdx.x, m = blockIdx.y;
-    int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.x,
-        w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.y;
-    // int h = threadIdx.y, w = threadIdx.x;
+    int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.y,
+        w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.x;
 
-    int c, p, q;
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+
+    int h_i = h - (K / 2);
+    int w_i = w - (K / 2);
+
     float res = 0.0f;
-    if (w >= W_out || h >= H_out) return;
+    int c, p, q;
+    if (b >= B || m >= M || h >= H_out || w >= W_out) return;
     for (c = 0; c < C; ++c) {
+        if ((h_i >= 0) && (h_i < H) &&
+            (w_i >= 0) && (w_i < W)) {
+            X_tile[ty][tx] = x4d(b, c, h_i, w_i);
+        } else {
+            X_tile[ty][tx] = 0.0f;
+        }
+        __syncthreads();
+
+        if ((tx < K) && (ty < K)) {
+            K_tile[ty][tx] = k4d(m, c, ty, tx);
+        }
+        __syncthreads();
+
         for (p = 0; p < K; ++p) {
             for (q = 0; q < K; ++q) {
-                res += x4d(b, c, h+p, w+q) * k4d(m, c, p, q);
+                if ((ty+p) < TILE_WIDTH+MASK_WIDTH-1 && (tx+q) < TILE_WIDTH+MASK_WIDTH-1)
+                    res += X_tile[ty+p][tx+q] * K_tile[p][q];
             }
         }
+        __syncthreads();
+
     }
     y4d(b, m, h, w) = res;
 
@@ -122,7 +149,6 @@ __host__ void GPUInterface::conv_forward_gpu(
         H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
 
 #ifdef CONV_DEBUG
-    std::cout << "Output image: " << H_out << " x " << W_out << std::endl;
     // print dimension information
     std::cout << "Grid Dimension: " << B << " x " << M << " x " << W_num * H_num << std::endl;
     std::cout << "Block Dimension: " << BLOCK_WIDTH << " x " << BLOCK_WIDTH << " x " << 1 << std::endl;
