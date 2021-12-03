@@ -3,7 +3,7 @@
 #include "gpu-new-forward.h"
 
 #define BLOCK_WIDTH 16
-// #define CONV_DEBUG
+#define CONV_DEBUG
 
 __global__ void conv_forward_kernel(
     float *y, const float *x, const float *k, 
@@ -45,8 +45,8 @@ __global__ void conv_forward_kernel(
     int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0));
         // H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
     int b = blockIdx.x, m = blockIdx.y;
-    int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.y,
-        w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.x;
+    int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.x,
+        w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.y;
     // int h = threadIdx.y, w = threadIdx.x;
 
     int c, p, q;
@@ -118,15 +118,18 @@ __host__ void GPUInterface::conv_forward_gpu(
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
 
+    int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0)),
+        H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
+
 #ifdef CONV_DEBUG
     std::cout << "Output image: " << H_out << " x " << W_out << std::endl;
     // print dimension information
     std::cout << "Grid Dimension: " << B << " x " << M << " x " << W_num * H_num << std::endl;
     std::cout << "Block Dimension: " << BLOCK_WIDTH << " x " << BLOCK_WIDTH << " x " << 1 << std::endl;
+    std::cout << "Kernel Dimension: " << M << " x " << C << " x " << K << " x " << K << std::endl;
+    std::cout << "Image Dimension: " << B << " x " << C << " x " << H << " x " << W << std::endl;
+    std::cout << "Output Dimension: " << B << " x " << M << " x " << H_out << " x " << W_out << std::endl;
 #endif
-
-    int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0)),
-        H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
 
     dim3 dimGrid(B, M, W_num * H_num);
     dim3 dimBlock(BLOCK_WIDTH, BLOCK_WIDTH, 1);
@@ -153,9 +156,9 @@ __host__ void GPUInterface::conv_forward_gpu_epilog(
     // Copy the output back to host
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
-    int y_size = B*M*H_out*W_out*sizeof(float), 
-        x_size = B*C*H*W*sizeof(float), 
-        k_size = M*C*K*K*sizeof(float);
+    int y_size = B*M*H_out*W_out*sizeof(float);
+        // x_size = B*C*H*W*sizeof(float), 
+        // k_size = M*C*K*K*sizeof(float);
     cudaMemcpy(host_y, device_y, y_size, cudaMemcpyDeviceToHost);
     // Free device memory
     cudaFree(device_y);
