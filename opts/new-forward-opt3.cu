@@ -1,6 +1,7 @@
 #include <cmath>
 #include <iostream>
 #include "gpu-new-forward.h"
+#include <cuda_fp16.h>
 
 #define TEST_NAME "opt3 10000"
 
