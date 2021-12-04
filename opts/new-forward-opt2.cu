@@ -106,9 +106,9 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(
               y_size = y_bytes*sizeof(float), 
               x_size = x_bytes*sizeof(float), 
               k_size = k_bytes*sizeof(float);
-              
-    cudaMalloc((void**) device_y_ptr, y_size_s);
-    cudaMalloc((void**) device_x_ptr, x_size_s);
+
+    cudaMalloc((void**) device_y_ptr, y_size);
+    cudaMalloc((void**) device_x_ptr, x_size);
     cudaMalloc((void**) device_k_ptr, k_size);
 
     // configure stream
