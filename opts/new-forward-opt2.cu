@@ -1,13 +1,11 @@
+// Shared memory matrix multiplication and input matrix unrolling
+
 #include <cmath>
 #include <iostream>
 #include "gpu-new-forward.h"
 
-#define TEST_NAME "opt1 10000"
-
 #define BLOCK_WIDTH 16
-#define TILE_WIDTH 16
-#define MASK_WIDTH 7
-// #define CONV_DEBUG
+#define CONV_DEBUG
 
 __global__ void conv_forward_kernel(
     float *y, const float *x, const float *k, 
@@ -45,59 +43,25 @@ __global__ void conv_forward_kernel(
 #define k4d(i3, i2, i1, i0) k[(i3) * (C * K * K) + (i2) * (K * K) + (i1) * (K) + i0]
 
     // Insert your GPU convolution kernel code here
-    /* strategy 3 need to change dimBlock, so we choose strategy 1 */
-
-    __shared__ float X_tile[TILE_WIDTH+MASK_WIDTH-1][TILE_WIDTH+MASK_WIDTH-1];
-    __shared__ float K_tile[MASK_WIDTH][MASK_WIDTH];
 
     int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0));
         // H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
     int b = blockIdx.x, m = blockIdx.y;
-    // int h_start = (blockIdx.z / W_num) * BLOCK_WIDTH,
-    //     w_start = (blockIdx.z % W_num) * BLOCK_WIDTH;
-    int ty = threadIdx.y, tx = threadIdx.x;
-    int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.y,
-        w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.x;
+    int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.x,
+        w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.y;
+    // int h = threadIdx.y, w = threadIdx.x;
 
-    float res = 0.0f;
     int c, p, q;
-    int i, j;
-    int h_offset, w_offset;
+    float res = 0.0f;
+    if (w >= W_out || h >= H_out) return;
     for (c = 0; c < C; ++c) {
-        // now there are 4 cases, like a 2D prefix sum
-        for (i = 0; i < 2; ++i) {
-            for (j = 0; j < 2; ++j) {
-                h_offset = i * TILE_WIDTH; w_offset = j * TILE_WIDTH;
-                if (ty + h_offset < TILE_WIDTH + K - 1 && tx + w_offset < TILE_WIDTH + K - 1) {
-                    if (h + h_offset < H && w + w_offset < W) {
-                        X_tile[ty + h_offset][tx + w_offset] = x4d(b, c, h + h_offset, w + w_offset);
-                    } else {
-                        X_tile[ty + h_offset][tx + w_offset] = 0.0f;
-                    }
-                }
-            }
-        }
-        __syncthreads();
-
-        if ((tx < K) && (ty < K)) {
-            K_tile[ty][tx] = k4d(m, c, ty, tx);
-        }
-        __syncthreads();
-
         for (p = 0; p < K; ++p) {
             for (q = 0; q < K; ++q) {
-                if ((ty+p) < TILE_WIDTH+K-1 && (tx+q) < TILE_WIDTH+K-1)
-                    res += X_tile[ty+p][tx+q] * K_tile[p][q];
+                res += x4d(b, c, h+p, w+q) * k4d(m, c, p, q);
             }
         }
-        __syncthreads();
-
     }
-    // if (b >= B || m >= M || h >= H_out || w >= W_out) res = 0.0f;
-    // y4d(b, m, h, w) = res;
-    if (b<B && m<M && h<H_out && w<W_out){
-	    y4d(b,m,h,w)=res;
-    }
+    y4d(b, m, h, w) = res;
 
 #undef y4d
 #undef x4d
@@ -158,8 +122,6 @@ __host__ void GPUInterface::conv_forward_gpu(
 
     int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0)),
         H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
-
-    std::cout << "TEST NAME: " << TEST_NAME << std::endl;
 
 #ifdef CONV_DEBUG
     // print dimension information

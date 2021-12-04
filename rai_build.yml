@@ -18,6 +18,9 @@ commands:
 
       ### You may modify the commands below. Uncomment/Comment lines based on the milestone
 
+      # troubleshootings:
+        # https://campuswire.com/c/GCBA2369E/feed/467
+
       # run "./rai -p <project-folder> --queue rai_amd64_ece408" to execute ("./rai -p ece408_project --queue rai_amd64_ece408")
       # run "./rai -p <project-folder> --queue rai_amd64_ece408" to execute ("./rai -p ece408_project --queue rai_amd64_exclusive") exclusively
       # run "./rai -p <project folder> --queue rai_amd64_ece408 --submit=m1" to submit ("./rai -p ece408_project --queue rai_amd64_ece408 --submit=m1")
@@ -44,5 +47,9 @@ commands:
 
       # ---------------- milestone 3 ----------------- #
       # use the "--queue rai_amd64_exclusive" flag to run your code on the exclusive server
-      - /bin/bash -c "time ./m3 10000"
+      - /bin/bash -c "time ./m3 1000"
+
+      # - nsys profile --stats=true ./m3
+
+      # - nv-nsight-cu-cli --section '.*' -o analysis_file ./m3
 

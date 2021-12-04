@@ -2,8 +2,10 @@
 #include <iostream>
 #include "gpu-new-forward.h"
 
+#define TEST_NAME "baseline 10000"
+
 #define BLOCK_WIDTH 16
-#define CONV_DEBUG
+// #define CONV_DEBUG
 
 __global__ void conv_forward_kernel(
     float *y, const float *x, const float *k, 
@@ -120,6 +122,8 @@ __host__ void GPUInterface::conv_forward_gpu(
 
     int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0)),
         H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
+
+    std::cout << "TEST NAME: " << TEST_NAME << std::endl;
 
 #ifdef CONV_DEBUG
     // print dimension information

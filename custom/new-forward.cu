@@ -2,6 +2,8 @@
 #include <iostream>
 #include "gpu-new-forward.h"
 
+#define TEST_NAME "opt1 1000"
+
 #define BLOCK_WIDTH 16
 #define TILE_WIDTH 16
 #define MASK_WIDTH 7
@@ -156,6 +158,8 @@ __host__ void GPUInterface::conv_forward_gpu(
 
     int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0)),
         H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
+
+    std::cout << "TEST NAME: " << TEST_NAME << std::endl;
 
 #ifdef CONV_DEBUG
     // print dimension information
