@@ -51,25 +51,52 @@ __global__ void conv_forward_kernel(
     int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0));
         // H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
     int b = blockIdx.x, m = blockIdx.y;
+    // int h_start = (blockIdx.z / W_num) * BLOCK_WIDTH,
+    //     w_start = (blockIdx.z % W_num) * BLOCK_WIDTH;
+    int ty = threadIdx.y, tx = threadIdx.x;
     int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.y,
         w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.x;
 
-    int tx = threadIdx.x;
-    int ty = threadIdx.y;
-
-    int h_i = h - (K / 2);
-    int w_i = w - (K / 2);
+    // int X_out_width = TILE_WIDTH + K - 1;
 
     float res = 0.0f;
     int c, p, q;
-    if (b >= B || m >= M || h >= H_out || w >= W_out) return;
+    int i, j;
+    int h_offset, w_offset;
     for (c = 0; c < C; ++c) {
-        if ((h_i >= 0) && (h_i < H) &&
-            (w_i >= 0) && (w_i < W)) {
-            X_tile[ty][tx] = x4d(b, c, h_i, w_i);
-        } else {
-            X_tile[ty][tx] = 0.0f;
+        // now there are 4 cases, like a 2D prefix sum
+        for (i = 0; i < 2; ++i) {
+            for (j = 0; j < 2; ++j) {
+                h_offset = i * TILE_WIDTH; w_offset = j * TILE_WIDTH;
+                if (ty + h_offset < TILE_WIDTH + K - 1 && tx + w_offset < TILE_WIDTH + K - 1) {
+                    if (h + h_offset < H && w + w_offset < W) {
+                        X_tile[ty + h_offset][tx + w_offset] = x4d(b, c, h + h_offset, w + w_offset);
+                    } else {
+                        X_tile[ty + h_offset][tx + w_offset] = 0.0f;
+                    }
+                }
+            }
         }
+        // if (h < H && w < W)
+        //     X_tile[ty][tx] = x4d(b, c, h, w);
+        // else
+        //     X_tile[ty][tx] = 0.0f;
+        // if ((tx < K - 1) && (ty < K - 1)) {
+        //     if ((h + TILE_WIDTH < H) && (w + TILE_WIDTH < W))
+        //         X_tile[ty + TILE_WIDTH][tx + TILE_WIDTH] = x4d(b, c, h + TILE_WIDTH, w + TILE_WIDTH);
+        //     else 
+        //         X_tile[ty + TILE_WIDTH][tx + TILE_WIDTH] = 0.0f;
+        // }
+        // for (int i=h; i<h_start+X_out_width; i+=TILE_WIDTH){
+		//     for (int j=w; j<w_start+X_out_width; j+=TILE_WIDTH){
+		// 	    if (i<H && j<W){
+		// 		    X_tile[i-h_start][j-w_start]=x4d(b,c,i,j);
+		// 	    }
+		// 	    else{
+		// 		    X_tile[i-h_start][j-w_start]=0;
+		// 	    }
+		//     }
+	    // }
         __syncthreads();
 
         if ((tx < K) && (ty < K)) {
@@ -79,14 +106,18 @@ __global__ void conv_forward_kernel(
 
         for (p = 0; p < K; ++p) {
             for (q = 0; q < K; ++q) {
-                if ((ty+p) < TILE_WIDTH+MASK_WIDTH-1 && (tx+q) < TILE_WIDTH+MASK_WIDTH-1)
+                if ((ty+p) < TILE_WIDTH+K-1 && (tx+q) < TILE_WIDTH+K-1)
                     res += X_tile[ty+p][tx+q] * K_tile[p][q];
             }
         }
         __syncthreads();
 
     }
-    y4d(b, m, h, w) = res;
+    // if (b >= B || m >= M || h >= H_out || w >= W_out) res = 0.0f;
+    // y4d(b, m, h, w) = res;
+    if (b<B && m<M && h<H_out && w<W_out){
+	    y4d(b,m,h,w)=res;
+    }
 
 #undef y4d
 #undef x4d
