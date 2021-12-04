@@ -1,4 +1,4 @@
-// Using Streams to overlap computation with data transfer
+// Opt2 Using Streams to overlap computation with data transfer
 
 #include <cmath>
 #include <iostream>
@@ -50,8 +50,8 @@ __global__ void conv_forward_kernel(
     int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0));
         // H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
     int b = blockIdx.x, m = blockIdx.y;
-    int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.x,
-        w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.y;
+    int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.y,
+        w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.x;
     // int h = threadIdx.y, w = threadIdx.x;
 
     int c, p, q;
