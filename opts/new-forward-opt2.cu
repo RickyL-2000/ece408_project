@@ -138,7 +138,7 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(
     std::cout << "Output Dimension: " << B << " x " << M << " x " << H_out << " x " << W_out << std::endl;
 #endif
 
-    dim3 dimGrid(B, M, W_num * H_num);
+    dim3 dimGrid(B/nStreams, M, W_num * H_num);
     dim3 dimBlock(BLOCK_WIDTH, BLOCK_WIDTH, 1);
 
     // call the forward kernel iteratively to achieve the stream effect
