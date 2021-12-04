@@ -8,7 +8,7 @@
 #define TILE_WIDTH 16
 #define CONV_DEBUG
 
-#define TEST_NAME "opt2 100"
+#define TEST_NAME "opt2 10000"
 
 __global__ void conv_forward_kernel(
     float *y, const float *x, const float *k, 
@@ -90,20 +90,25 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(
     //     exit(-1);
     // }
 
-    const int nStreams = 8;
+    const int nStreams = 16;
 
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
 
     const int y_bytes_s = B*M*H_out*W_out/nStreams, 
               x_bytes_s = B*C*H*W/nStreams, 
+              y_bytes = B*M*H_out*W_out, 
+              x_bytes = B*C*H*W, 
               k_bytes = M*C*K*K;
 
-    const int y_size = y_bytes_s*sizeof(float), 
-              x_size = x_bytes_s*sizeof(float), 
+    const int y_size_s = y_bytes_s*sizeof(float), 
+              x_size_s = x_bytes_s*sizeof(float), 
+              y_size = y_bytes*sizeof(float), 
+              x_size = x_bytes*sizeof(float), 
               k_size = k_bytes*sizeof(float);
-    cudaMalloc((void**) device_y_ptr, y_size);
-    cudaMalloc((void**) device_x_ptr, x_size);
+              
+    cudaMalloc((void**) device_y_ptr, y_size_s);
+    cudaMalloc((void**) device_x_ptr, x_size_s);
     cudaMalloc((void**) device_k_ptr, k_size);
 
     // configure stream
@@ -113,7 +118,7 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(
     for (i = 0; i< nStreams; ++i) cudaStreamCreate(&streams[i]);
     
     for (i = 0; i < nStreams; ++i) {
-        cudaMemcpyAsync((*device_x_ptr)+i*x_bytes_s, host_x+i*x_bytes_s, x_size, cudaMemcpyHostToDevice, streams[i]);
+        cudaMemcpyAsync((*device_x_ptr)+i*x_bytes_s, host_x+i*x_bytes_s, x_size_s, cudaMemcpyHostToDevice, streams[i]);
     }
     // kernel should be used entirely, so no split
     cudaMemcpyAsync(*device_k_ptr, host_k, k_size, cudaMemcpyHostToDevice, streams[0]);
@@ -143,7 +148,7 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(
 
     // copy the result back to y
     for (i = 0; i < nStreams; ++i) {
-        cudaMemcpyAsync(host_y + i*y_bytes_s, (*device_y_ptr) + i*y_bytes_s , y_size, cudaMemcpyDeviceToHost, streams[i]);
+        cudaMemcpyAsync(host_y + i*y_bytes_s, (*device_y_ptr) + i*y_bytes_s , y_size_s, cudaMemcpyDeviceToHost, streams[i]);
     }
 
     cudaDeviceSynchronize();
@@ -221,10 +226,10 @@ __host__ void GPUInterface::conv_forward_gpu_epilog(
     // Copy the output back to host
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
-    int y_size = B*M*H_out*W_out*sizeof(float);
-        // x_size = B*C*H*W*sizeof(float), 
+    int y_size_s = B*M*H_out*W_out*sizeof(float);
+        // x_size_s = B*C*H*W*sizeof(float), 
         // k_size = M*C*K*K*sizeof(float);
-    cudaMemcpy(host_y, device_y, y_size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(host_y, device_y, y_size_s, cudaMemcpyDeviceToHost);
     // Free device memory
     cudaFree(device_y);
     cudaFree(device_x);
