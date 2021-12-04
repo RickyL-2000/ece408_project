@@ -110,13 +110,13 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(
     int i;
 
     cudaStream_t streams[nStreams];
-    for (i = 0; i< nStreams; ++i) cudaStreamCreate(&stream[i]);
+    for (i = 0; i< nStreams; ++i) cudaStreamCreate(&streams[i]);
     
     for (i = 0; i < nStreams; ++i) {
-        cudaMemcpyAsync((*device_x_ptr)+i*x_bytes_s, host_x+i*x_bytes_s, x_size, cudaMemcpyHostToDevice, stream[i]);
+        cudaMemcpyAsync((*device_x_ptr)+i*x_bytes_s, host_x+i*x_bytes_s, x_size, cudaMemcpyHostToDevice, streams[i]);
     }
     // kernel should be used entirely, so no split
-    cudaMemcpyAsync(*device_k_ptr, host_k, k_size, cudaMemcpyHostToDevice, stream[0]);
+    cudaMemcpyAsync(*device_k_ptr, host_k, k_size, cudaMemcpyHostToDevice, streams[0]);
     
     // Now move the whole [conv_forward_gpu] here, merge them into a stream version
     const int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0)),
@@ -138,19 +138,19 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(
 
     // call the forward kernel iteratively to achieve the stream effect
     for (i = 0; i < nStreams; ++i) {
-        conv_forward_kernel<<<dimGrid, dimBlock, 0, stream[i]>>>((*device_y_ptr)+i*y_bytes_s, (*device_x_ptr)+i*x_bytes_s, device_k_ptr, B, M, C, H, W, K);
+        conv_forward_kernel<<<dimGrid, dimBlock, 0, streams[i]>>>((*device_y_ptr)+i*y_bytes_s, (*device_x_ptr)+i*x_bytes_s, *device_k_ptr, B, M, C, H, W, K);
     }
 
     // copy the result back to y
     for (i = 0; i < nStreams; ++i) {
-        cudaMemcpyAsync(host_y + i*y_bytes_s, (*device_y_ptr) + i*y_bytes_s , y_size, cudaMemcpyDeviceToHost, stream[i]);
+        cudaMemcpyAsync(host_y + i*y_bytes_s, (*device_y_ptr) + i*y_bytes_s , y_size, cudaMemcpyDeviceToHost, streams[i]);
     }
 
     cudaDeviceSynchronize();
 
     // destroy the streams
     for (i = 0; i < nStreams; ++i) {
-      cudaStreamDestroy(stream[i]);
+      cudaStreamDestroy(streams[i]);
     }
 
     // free
