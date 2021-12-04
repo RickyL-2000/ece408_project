@@ -5,7 +5,7 @@
 #define BLOCK_WIDTH 16
 #define TILE_WIDTH 16
 #define MASK_WIDTH 7
-#define CONV_DEBUG
+// #define CONV_DEBUG
 
 __global__ void conv_forward_kernel(
     float *y, const float *x, const float *k, 
@@ -57,8 +57,6 @@ __global__ void conv_forward_kernel(
     int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.y,
         w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.x;
 
-    // int X_out_width = TILE_WIDTH + K - 1;
-
     float res = 0.0f;
     int c, p, q;
     int i, j;
@@ -77,26 +75,6 @@ __global__ void conv_forward_kernel(
                 }
             }
         }
-        // if (h < H && w < W)
-        //     X_tile[ty][tx] = x4d(b, c, h, w);
-        // else
-        //     X_tile[ty][tx] = 0.0f;
-        // if ((tx < K - 1) && (ty < K - 1)) {
-        //     if ((h + TILE_WIDTH < H) && (w + TILE_WIDTH < W))
-        //         X_tile[ty + TILE_WIDTH][tx + TILE_WIDTH] = x4d(b, c, h + TILE_WIDTH, w + TILE_WIDTH);
-        //     else 
-        //         X_tile[ty + TILE_WIDTH][tx + TILE_WIDTH] = 0.0f;
-        // }
-        // for (int i=h; i<h_start+X_out_width; i+=TILE_WIDTH){
-		//     for (int j=w; j<w_start+X_out_width; j+=TILE_WIDTH){
-		// 	    if (i<H && j<W){
-		// 		    X_tile[i-h_start][j-w_start]=x4d(b,c,i,j);
-		// 	    }
-		// 	    else{
-		// 		    X_tile[i-h_start][j-w_start]=0;
-		// 	    }
-		//     }
-	    // }
         __syncthreads();
 
         if ((tx < K) && (ty < K)) {
