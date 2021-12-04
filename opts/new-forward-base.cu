@@ -70,7 +70,7 @@ __global__ void conv_forward_kernel(
 
 	
 __host__ void GPUInterface::conv_forward_gpu_prolog(
-    const float *host_y, const float *host_x, const float *host_k, 
+    float *host_y, const float *host_x, const float *host_k, 
     float **device_y_ptr, float **device_x_ptr, float **device_k_ptr, 
     const int B, const int M, const int C, const int H, const int W, const int K)
 {
