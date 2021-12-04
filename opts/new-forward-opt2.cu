@@ -6,7 +6,7 @@
 
 #define BLOCK_WIDTH 16
 #define TILE_WIDTH 16
-// #define CONV_DEBUG
+#define CONV_DEBUG
 
 #define TEST_NAME "opt2 100"
 
@@ -176,13 +176,14 @@ __host__ void GPUInterface::conv_forward_gpu(
 
     return;
 
-
     // Set the kernel dimensions and call the kernel
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
 
     int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0)),
         H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
+
+    std::cout << "TEST NAME: " << TEST_NAME << std::endl;
 
 #ifdef CONV_DEBUG
     // print dimension information
@@ -215,6 +216,8 @@ __host__ void GPUInterface::conv_forward_gpu_epilog(
     float *host_y, float *device_y, float *device_x, float *device_k, 
     const int B, const int M, const int C, const int H, const int W, const int K)
 {
+    return;
+
     // Copy the output back to host
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
