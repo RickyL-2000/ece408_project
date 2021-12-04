@@ -1,12 +1,14 @@
+// Opt3
+
 #include <cmath>
 #include <iostream>
 #include "gpu-new-forward.h"
 #include <cuda_fp16.h>
 
-#define TEST_NAME "opt3 10000"
+#define TEST_NAME "opt3 1000"
 
 #define BLOCK_WIDTH 16
-// #define CONV_DEBUG
+#define CONV_DEBUG
 
 __global__ void conv_forward_kernel(
     float *y, const float *x, const float *k, 
@@ -48,13 +50,14 @@ __global__ void conv_forward_kernel(
     int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0));
         // H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
     int b = blockIdx.x, m = blockIdx.y;
-    int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.x,
-        w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.y;
+    int h = (blockIdx.z / W_num) * BLOCK_WIDTH + threadIdx.y,   // why is this y???? not x???
+        w = (blockIdx.z % W_num) * BLOCK_WIDTH + threadIdx.x;
     // int h = threadIdx.y, w = threadIdx.x;
 
     int c, p, q;
     // define half precision float
-    half res = __float2half(0.0f);
+    float r = 0;
+    half res = __float2half(r);
     if (w >= W_out || h >= H_out) return;
     for (c = 0; c < C; ++c) {
         for (p = 0; p < K; ++p) {
