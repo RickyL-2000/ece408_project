@@ -2,7 +2,7 @@
 #include <iostream>
 #include "gpu-new-forward.h"
 
-#define TEST_NAME "opt1 10000"
+#define TEST_NAME "opt1 10000 nsys ns"
 
 #define BLOCK_WIDTH 16
 #define TILE_WIDTH 16

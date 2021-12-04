@@ -1,11 +1,14 @@
-// Shared memory matrix multiplication and input matrix unrolling
+// Using Streams to overlap computation with data transfer
 
 #include <cmath>
 #include <iostream>
 #include "gpu-new-forward.h"
 
 #define BLOCK_WIDTH 16
-#define CONV_DEBUG
+#define TILE_WIDTH 16
+// #define CONV_DEBUG
+
+#define TEST_NAME "opt2 100"
 
 __global__ void conv_forward_kernel(
     float *y, const float *x, const float *k, 
@@ -87,19 +90,73 @@ __host__ void GPUInterface::conv_forward_gpu_prolog(
     //     exit(-1);
     // }
 
+    const int nStreams = 8;
+
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
 
-    int y_size = B*M*H_out*W_out*sizeof(float), 
-        x_size = B*C*H*W*sizeof(float), 
-        k_size = M*C*K*K*sizeof(float);
+    const int y_bytes_s = B*M*H_out*W_out/nStreams, 
+              x_bytes_s = B*C*H*W/nStreams, 
+              k_bytes = M*C*K*K;
+
+    const int y_size = y_bytes_s*sizeof(float), 
+              x_size = x_bytes_s*sizeof(float), 
+              k_size = k_bytes*sizeof(float);
     cudaMalloc((void**) device_y_ptr, y_size);
     cudaMalloc((void**) device_x_ptr, x_size);
     cudaMalloc((void**) device_k_ptr, k_size);
 
-    cudaMemcpy(*device_y_ptr, host_y, y_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(*device_x_ptr, host_x, x_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(*device_k_ptr, host_k, k_size, cudaMemcpyHostToDevice);
+    // configure stream
+    int i;
+
+    cudaStream_t streams[nStreams];
+    for (i = 0; i< nStreams; ++i) cudaStreamCreate(&stream[i]);
+    
+    for (i = 0; i < nStreams; ++i) {
+        cudaMemcpyAsync((*device_x_ptr)+i*x_bytes_s, host_x+i*x_bytes_s, x_size, cudaMemcpyHostToDevice, stream[i]);
+    }
+    // kernel should be used entirely, so no split
+    cudaMemcpyAsync(*device_k_ptr, host_k, k_size, cudaMemcpyHostToDevice, stream[0]);
+    
+    // Now move the whole [conv_forward_gpu] here, merge them into a stream version
+    const int W_num = ceil(W_out / (BLOCK_WIDTH * 1.0)),
+              H_num = ceil(H_out / (BLOCK_WIDTH * 1.0));
+
+    std::cout << "TEST NAME: " << TEST_NAME << std::endl;
+
+#ifdef CONV_DEBUG
+    // print dimension information
+    std::cout << "Grid Dimension: " << B << " x " << M << " x " << W_num * H_num << std::endl;
+    std::cout << "Block Dimension: " << BLOCK_WIDTH << " x " << BLOCK_WIDTH << " x " << 1 << std::endl;
+    std::cout << "Kernel Dimension: " << M << " x " << C << " x " << K << " x " << K << std::endl;
+    std::cout << "Image Dimension: " << B << " x " << C << " x " << H << " x " << W << std::endl;
+    std::cout << "Output Dimension: " << B << " x " << M << " x " << H_out << " x " << W_out << std::endl;
+#endif
+
+    dim3 dimGrid(B, M, W_num * H_num);
+    dim3 dimBlock(BLOCK_WIDTH, BLOCK_WIDTH, 1);
+
+    // call the forward kernel iteratively to achieve the stream effect
+    for (i = 0; i < nStreams; ++i) {
+        conv_forward_kernel<<<dimGrid, dimBlock, 0, stream[i]>>>((*device_y_ptr)+i*y_bytes_s, (*device_x_ptr)+i*x_bytes_s, device_k_ptr, B, M, C, H, W, K);
+    }
+
+    // copy the result back to y
+    for (i = 0; i < nStreams; ++i) {
+        cudaMemcpyAsync(host_y + i*y_bytes_s, (*device_y_ptr) + i*y_bytes_s , y_size, cudaMemcpyDeviceToHost, stream[i]);
+    }
+
+    cudaDeviceSynchronize();
+
+    // destroy the streams
+    for (i = 0; i < nStreams; ++i) {
+      cudaStreamDestroy(stream[i]);
+    }
+
+    // free
+    cudaFree(*device_x_ptr);
+    cudaFree(*device_y_ptr);
+    cudaFree(*device_k_ptr);
     
 #ifdef CONV_DEBUG
     cudaError_t error = cudaGetLastError();
@@ -116,6 +173,10 @@ __host__ void GPUInterface::conv_forward_gpu(
     float *device_y, const float *device_x, const float *device_k, 
     const int B, const int M, const int C, const int H, const int W, const int K)
 {
+
+    return;
+
+
     // Set the kernel dimensions and call the kernel
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
