@@ -47,9 +47,15 @@ commands:
 
       # ---------------- milestone 3 ----------------- #
       # use the "--queue rai_amd64_exclusive" flag to run your code on the exclusive server
-      - /bin/bash -c "time ./m3 1000"
+      - /bin/bash -c "time ./m3 10000"
 
       # - nsys profile --stats=true ./m3
 
       # - nv-nsight-cu-cli --section '.*' -o analysis_file ./m3
+
+      # check the ranking
+      # ./rai -p ece408_project ranking
+
+      # submit
+      # ./rai -p ece408_project --submit=m3
 
